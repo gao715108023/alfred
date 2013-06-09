@@ -1,0 +1,126 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Calendar;
+import java.util.List;
+
+import edu.udo.cs.wvtool.config.WVTConfiguration;
+import edu.udo.cs.wvtool.config.WVTConfigurationFact;
+import edu.udo.cs.wvtool.generic.output.WordVectorWriter;
+import edu.udo.cs.wvtool.generic.stemmer.DummyStemmer;
+import edu.udo.cs.wvtool.generic.stemmer.WVTStemmer;
+import edu.udo.cs.wvtool.generic.tokenizer.WVTTokenizer;
+import edu.udo.cs.wvtool.generic.vectorcreation.TFIDF;
+import edu.udo.cs.wvtool.generic.wordfilter.DummyWordFilter;
+import edu.udo.cs.wvtool.generic.wordfilter.WVTWordFilter;
+import edu.udo.cs.wvtool.main.WVTDocumentInfo;
+import edu.udo.cs.wvtool.main.WVTFileInputList;
+import edu.udo.cs.wvtool.main.WVTWordVector;
+import edu.udo.cs.wvtool.main.WVTool;
+import edu.udo.cs.wvtool.wordlist.WVTWordList;
+
+public class MyTest{
+
+     public static void main(String[] args) throws Exception {
+       //初始化一个WVTool对象
+        WVTool wvt = new WVTool(false);
+
+        //初始化一个configuration对象
+        WVTConfiguration config = new WVTConfiguration();
+
+       WVTStemmer stemmer = new DummyStemmer();
+        WVTTokenizer tk = new ChineseTokenizer();
+
+        //DummyStopWordFilter filter = new DummyStopWordFilter();
+        WVTWordFilter filter = new DummyWordFilter();
+        
+               
+        config.setConfigurationRule(WVTConfiguration.STEP_TOKENIZER, new WVTConfigurationFact(tk));
+        config.setConfigurationRule(WVTConfiguration.STEP_STEMMER, new WVTConfigurationFact(stemmer));
+        config.setConfigurationRule(WVTConfiguration.STEP_WORDFILTER, new WVTConfigurationFact(filter));
+
+         WVTFileInputList list = new WVTFileInputList(2);
+        
+        // Add entries
+        //为输入添加一个文档信息对象 （WVTDocumentInfo）,其中sourceName对象可以是一个文件夹的名称，也可以是一个文件名称, 最后一个0这个文档信息对象的类别 
+        //样本数据
+        //list.addEntry(new WVTDocumentInfo("a.txt", "txt", "", "", 0));
+        //list.addEntry(new WVTDocumentInfo("b.txt", "txt", "", "", 1));
+        list.addEntry(new WVTDocumentInfo("D:/temp/1", "txt", "", "chinese", 0));
+        list.addEntry(new WVTDocumentInfo("D:/temp/2", "txt", "", "chinese", 1));
+        
+        //生成wordList
+        WVTWordList wordList = wvt.createWordList(list, config);
+        //对wordList中词频做出一个限制，即词频在1<n<5之间
+        wordList.pruneByFrequency(1, 5);
+
+        //生成词组文件
+        wordList.storePlain(new FileWriter("wordlist.txt"));
+        
+        // 生成词频文件  
+        wordList.store(new FileWriter("wordVector.txt"));
+        
+        //将生成的文本向量空间写入一个特定的文件
+        FileWriter outFile = new FileWriter("wv.txt");
+        
+        //DummyWordVectorWriter wvw = new DummyWordVectorWriter(outFile, true);
+        WordVectorWriter wvw = new WordVectorWriter(outFile,true); 
+
+        config.setConfigurationRule(WVTConfiguration.STEP_OUTPUT, new WVTConfigurationFact(wvw));
+        config.setConfigurationRule(WVTConfiguration.STEP_VECTOR_CREATION, new WVTConfigurationFact(new TFIDF()));
+
+        //Create the vectors
+        WVTWordVector[] vectors = wvt.createVectors(list, config, wordList,null);
+
+        //Close the output file
+        wvw.close();
+        outFile.close();
+
+        // 一个使用wordList构建文本空间向量的实例
+        //WVTWordVector q = wvt.createVector("cmu harvard net", wordList);
+        
+        //测试的文本
+        WVTDocumentInfo d = new WVTDocumentInfo("", "txt", "", "chinese");  
+        //测试文本的内容
+        String txt = getContent("test.txt");
+        //根据wordlist和config 生成向量
+    	WVTWordVector q = wvt.createVector(txt, d, config, wordList);
+
+        FileWriter outFile1 = new FileWriter("test_wv1.txt");
+        WordVectorWriter wvw1 = new WordVectorWriter(outFile1, true);       
+        wvw1.write(q);        
+        wvw1.close();
+        outFile1.close();
+        
+        //knn算法分类
+        KNN knn = new KNN();	  
+        //分类结果
+        List result = knn.LazyLearning(q, vectors, list.getNumClasses());	     	        
+        for(int i=0;i<result.size();i++){
+        	CategoryResult cr = (CategoryResult) result.get(i);
+        	System.out.println("rs:"+cr.getCategoryName()+" "+cr.getSimilarity());
+        }
+
+    }
+     
+ 	public static String getContent(String file) throws IOException{
+		File myfile = new File(file);
+        if (!myfile.exists()) {
+          return "";
+        }
+        File f=new File(file);
+        InputStreamReader  read = new InputStreamReader (new FileInputStream(f));
+        BufferedReader reader = new BufferedReader(read);
+        String line;
+        String strContent = "";
+        while((line=reader.readLine())!=null){
+        	strContent+=line;
+        }
+        return strContent;
+
+	}
+     
+}
