@@ -1,0 +1,16 @@
+方法一：
+JRedis jredis = new JRedisClient("192.168.1.238", 6380);
+if(jredis.exists("name")){
+  jredis.get("name");
+}
+redis.quit();
+
+方法二：
+static JRedisService jredisService =  null;
+static{
+  ConnectionSpec connectionSpec = DefaultConnectionSpec.newSpec("192.168.1.238", 6380, 0,null);
+	connectionSpec.setReconnectCnt(100);
+	connectionSpec.setHeartbeat(2);
+	jredisService = new JRedisService(connectionSpec, 10);
+}
+jredisService.get("name");
