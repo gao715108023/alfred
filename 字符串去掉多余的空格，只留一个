@@ -1,0 +1,1 @@
+lineStr = lineStr.replaceAll(" {2,}", " ").trim();
